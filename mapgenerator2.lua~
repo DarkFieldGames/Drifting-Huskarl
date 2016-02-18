@@ -1,0 +1,20 @@
+require "map7"
+require "bucketfill"
+
+function printmap (map)
+arrayteststring = ""
+for i = 1, #roommap do
+  for j = 1, #roommap[i] do
+      arrayteststring = arrayteststring .. roommap[i][j] .. " "
+  end
+  print (arrayteststring)
+  arrayteststring = ""
+end
+end
+
+for k = 1, 10000 do
+  mapgen (map,roommap,start_point_x,start_point_y)
+
+  print (start_point_x)
+  print (start_point_y)
+end

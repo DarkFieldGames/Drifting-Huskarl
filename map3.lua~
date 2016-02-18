@@ -1,0 +1,411 @@
+#!/usr/bin/lua
+--io.write ("What is your name? ")
+--name = io.read ()
+--print ("hello " .. name)
+
+function genmap()
+
+
+map = {}    -- map array
+uncorrimap = {} -- map to revert to if corridor generation fails so can restart with the corridor generation
+corrimap = {} -- corrigentest array
+
+
+mapmax_x = 32
+mapmax_y = 24
+
+hungerarea_x = 9
+hungerarea_y = 6
+
+map_gen_fine = false
+while map_gen_fine == false do
+map_room_cord_x = {}
+map_room_cord_y = {}
+map_room_size_x = {}
+map_room_size_y = {}
+room_connected = {}
+
+-- 0 is no connection
+-- 1 is connection
+
+map_room_count = 0
+
+-- creates and sets the array to 0 (i.e default)
+for i=1, mapmax_x do
+   map[i] = {}
+   uncorrimap[i] = {}
+   corrimap[i] = {}
+   for j=1, mapmax_y do
+      map[i][j] = 0
+      uncorrimap[i][j] = 0
+      corrimap[i][j] = 0
+   end
+end
+
+
+-- auto level generation.
+
+-- parse map, outside tiles must be wall tiles only
+-- come up with some defined room sizes
+
+-- create start and end areas
+
+-- 1 = start area
+-- 2 = randomly generated room
+
+
+--print ("now for the fun part")
+--print ((mapmax_x - 4))
+
+
+
+-- generate the start area
+
+math.randomseed( os.time() )
+
+-- initial starting room size
+-- if you want a predefined starting room, leave this code in, else change the code below
+-- the corridor generation is set to connect the first generated room to the nearest room initially
+
+map_gen_fine = false
+
+
+room_size_x = 4
+room_size_y = 4
+roomplaced = false
+while roomplaced == false do
+  -- change these parameters if you are changing the starting room parameters
+  crystart_x = math.random(3, (mapmax_x - 4))
+  crystart_y = math.random(3, (mapmax_y - 4))
+      if crystart_x + 3 + 1 >= (mapmax_x - hungerarea_x) and crystart_y - 2 <= hungerarea_y then
+         roomplaced = false
+      else
+         roomplaced = true
+      end
+end
+
+-- append start location to co-ord array
+
+table.insert(map_room_cord_x, crystart_x)
+table.insert(map_room_cord_y, crystart_y)
+table.insert(map_room_size_x, room_size_x)
+table.insert(map_room_size_y, room_size_y)
+table.insert(room_connected, 0)
+
+map_room_count = map_room_count + 1
+
+
+
+--print("map cords x " .. map_room_cord_x[1])
+--print("map cords y " .. map_room_cord_y[1])
+
+for i=crystart_x, (crystart_x + 2) do
+   for j=crystart_y, (crystart_y + 2) do
+        map[i][j] = 1
+   end
+end
+
+-- generates some example rooms
+-- internal while loop there to loop until the room is placed.
+failure_placement_counter = 0
+for gen = 1,math.random(3,5),1 do
+    roomplaced = false
+    check = false
+    while roomplaced == false do
+      failure_placement_counter = failure_placement_counter + 1
+      check = true
+      array_sum = 0 -- checks to see if all empty space values are 0
+      room_size_x = math.random(4,6)
+      room_size_y = math.random(4,6)
+      room_x = math.random(4, (mapmax_x - room_size_x - 3)) -- the 1 is to allow for wall tiles
+      room_y = math.random(4, (mapmax_y - room_size_y - 3)) -- the 1 is to allow for wall tiles
+
+--      print ("room_x " .. room_x)
+ --     print ("room_y " .. room_y)
+    -- test to see if roomplacement is possible
+      for i = (room_x - 3), (room_x + room_size_x + 2) do
+        for j = (room_y - 3), (room_y + room_size_y + 2) do
+           array_sum = array_sum + map[i][j]
+         end
+      end
+      if array_sum > 0 then
+         check = false
+      end
+-- make sure rooms dont appear in the hunger area
+-- from the right
+      if room_x + room_size_x + 1 >= (mapmax_x - hungerarea_x) and room_y - 2 <= hungerarea_y then
+         check = false
+      end
+      if check == true then
+         roomplaced = true
+         map_gen_fine = true
+      end
+
+      if failure_placement_counter >= 10 then
+        -- getout loop and restart
+        map_gen_fine = false
+        roomplaced = true
+      end
+    end
+    
+    for i = room_x, (room_x + room_size_x - 1) do
+       for j = room_y, (room_y + room_size_y - 1) do
+          map[i][j] = 1
+       end
+    end
+-- counts number of rooms, for future refference
+    map_room_count = map_room_count + 1
+    table.insert(map_room_cord_x, room_x)
+    table.insert(map_room_cord_y, room_y)
+    table.insert(map_room_size_x, room_size_x)
+    table.insert(map_room_size_y, room_size_y)
+    table.insert(room_connected, 0)
+
+end
+-- map made
+end
+
+
+mapcoordtest = "map coords "
+maproomsizetest = "map sizes "
+for j = 1, map_room_count do
+   mapcoordtest = mapcoordtest .. "(" ..  map_room_cord_x[j] .. "," .. map_room_cord_y[j] .. ")" .. " "
+   maproomsizetest = maproomsizetest .. "(" ..  map_room_size_x[j] .. "," .. map_room_size_y[j] .. ")" .. " " 
+end
+print (mapcoordtest)
+print (maproomsizetest)
+
+-- room generation successful
+-- copy room generated modules into backup map arrays
+
+for i=1, mapmax_x do
+   for j=1, mapmax_y do
+      uncorrimap[i][j] = map[i][j]
+      corrimap[i][j] = map[i][j]
+   end
+end
+
+-- establish initial corridor connections
+
+
+-- now to generate corridors
+-- semi random walk algorithm.
+
+
+-- generate map_room_count - 1 to map_room_count * 2 corridors
+-- 0.65 chance of corridor starting facing the room
+-- 0.45 chance of corridor starting in the opposite direction
+-- not all rooms need to be connected linearally
+-- apply this both to the x and y side
+-- probability of randomly turning on the path = 0.3
+-- probability of carrying on this path = 0.4
+-- probability of turning the corridor generator to the right room when corridor location is within the same values as the room itself = 0.7
+
+-- initiall corridor generation algoritm
+
+-- create initial corridor
+
+
+--mapstring =  "Sx " .. map_room_cord_x[1] .. " Sy " .. map_room_cord_y[1] .. " Sxlen " .. map_room_size_x[1] .. " Sylen " .. map_room_size_y[1] ..  ""
+--print (mapstring)
+-- we need all things to be probably the same as accuratly as possible. So if corridor start location not suitable, rerun it
+
+-- this algorithm also takes into the possibility of not wanting to start corridors that are right next to walls or other rooms except the one it wants to connect to
+
+-- nearest room algorithm for the first to second room connection, will make this down to probability sometime soon
+-- we shall be doing this radially
+
+-- spawn 5 corridors
+
+corridor_tile_placement = 0
+cori_gen_start = false
+for corri_j = 1,50 do
+   connection = false
+   while connection == false do
+     while cori_gen_start == false do
+     attempt_counter = 0
+     if corri_j > map_room_count then
+       room_selected = math.random(1,map_room_count)
+     else
+       room_selected = corri_j
+     end
+     room_init_select_x = map_room_cord_x[room_selected]
+     room_init_select_y = map_room_cord_y[room_selected]
+     room_init_size_x = map_room_size_x[room_selected]
+     room_init_size_y = map_room_size_y[room_selected]
+
+
+
+
+      x_dom = math.random()
+      if x_dom >= 0.5 then
+      -- coridor starts along the top or bottom
+      corri_start_x = math.random((room_init_select_x), (room_init_select_x + room_init_size_x - 1))
+      corri_current_x = corri_start_x
+       y_place = math.random()
+       if y_place >= 0.5 then
+        -- corridor placed at the top
+        corri_start_y = (room_init_select_y - 1)
+        -- final check
+        if (corri_start_y - 2) ~= 1 then
+           if corri_start_y - 2 > hungerarea_y and corri_start_x + 1 < (mapmax_x - hungerarea_x) then
+           cori_gen_start = true
+           corri_direction = 1
+           corri_current_y = corri_start_y
+           uncorrimap[corri_current_x][corri_current_y] = 2
+           end
+        end
+       else
+        corri_start_y = (room_init_select_y + room_init_size_y)
+--      don't spawn coridoors facing edges of the map
+        if (corri_start_y + 2) ~= mapmax_y then
+           cori_gen_start = true
+           corri_direction = 2
+           corri_current_y = corri_start_y
+           uncorrimap[corri_current_x][corri_current_y] = 2
+        end
+       end
+      else
+     -- corridor starts along the left or right
+        corri_start_y = math.random((room_init_select_y), (room_init_select_y + room_init_size_y - 1))
+        corri_current_y = corri_start_y
+        x_place = math.random()
+        if x_place >= 0.5 then
+        -- corridor placed to the left
+        corri_start_x = (room_init_select_x - 1)
+          if (corri_start_x - 2) ~= 1 then
+              cori_gen_start = true
+              corri_direction = 3
+              corri_current_x = corri_start_x
+              uncorrimap[corri_current_x][corri_current_y] = 2
+          end
+         else
+         corri_start_x = (room_init_select_x + room_init_size_x)
+           if (corri_start_x + 2) ~= mapmax_x then
+    -- don't go into the hunger area
+            if corri_start_x + 2 < (mapmax_x - hungerarea_x) and corri_start_y + 1 > hungerarea_y then
+              cori_gen_start = true
+              corri_direction = 4
+              corri_current_x = corri_start_x
+              uncorrimap[corri_current_x][corri_current_y] = 2
+            end
+           end
+         end
+        end
+     end
+-- ends the initial placement algorithm
+
+
+    if corri_direction == 1 then
+       if corri_current_y - 1 > 1 then
+       if corri_current_x - 1 <= (mapmax_x - hungerarea_x - 1) and corri_current_y - 1 >= hungerarea_y then
+       if uncorrimap[corri_current_x][corri_current_y - 1] == 1 then
+          connection = true
+          corrimap = uncorrimap
+       else
+          corri_current_y = corri_current_y - 1
+          uncorrimap[corri_current_x][corri_current_y] = 2
+       end
+       end
+       end
+    end
+
+
+    if corri_direction == 2 then
+       if corri_current_y + 1 < mapmax_y - 1 then
+       if uncorrimap[corri_current_x][corri_current_y + 1] == 1 then
+          connection = true
+          corrimap = uncorrimap
+       else
+          corri_current_y = corri_current_y + 1
+          uncorrimap[corri_current_x][corri_current_y] = 2
+       end
+       end
+    end
+
+    if corri_direction == 3 then
+       if corri_current_x - 1 > 1 then
+       if uncorrimap[corri_current_x - 1][corri_current_y] == 1 then
+          connection = true
+          corrimap = uncorrimap
+       else
+          corri_current_x = corri_current_x - 1
+          uncorrimap[corri_current_x][corri_current_y] = 2
+       end
+       end
+    end
+
+    if corri_direction == 4 then
+       if corri_current_x + 1 < mapmax_x then
+       if corri_current_x + 1 <= (mapmax_x - hungerarea_x - 1) and corri_current_y - 2 >= hungerarea_y then
+       if uncorrimap[corri_current_x + 1][corri_current_y] == 1 then
+          connection = true
+          corrimap = uncorrimap
+       else
+          corri_current_x = corri_current_x + 1
+          uncorrimap[corri_current_x][corri_current_y] = 2
+       end
+       end
+       end
+    end
+
+    change_direction = math.random(1,8) -- if 4, then change direction
+    if change_direction == 8 then
+       initial_direction = true
+       initial_direction_value = corri_direction
+       while initial_direction == true do
+         corri_direction = math.random(1,4)
+         if initial_direction_value == corri_direction then
+           initial_direction = true
+         else
+           initial_direction = false
+         end
+       end
+    end
+
+    attempt_counter = attempt_counter + 1
+    if attempt_counter >= 50 then
+      cori_gen_start = false
+      uncorrimap = corrimap
+      attempt_counter = 0
+    end
+
+
+  end
+
+print ("corri loop " .. corri_j)
+end
+
+    
+-- 1 = up
+-- 2 = down
+-- 3 = left
+-- 4 = right
+
+map = corrimap
+
+for i=1, mapmax_x do
+   for j=1, mapmax_y do
+      if map[i][j] == 2 then
+         map[i][j] = 1
+      end
+   end
+end
+
+
+arrayteststring = ""
+arrayteststring2 = ""
+for j = 1, mapmax_y do
+  for i = 1, mapmax_x do
+      arrayteststring = arrayteststring .. map[i][j] .. " "
+--      arrayteststring2 = arrayteststring2 .. uncorrimap[i][j] .. " "
+  end
+  print (arrayteststring)
+--  print (arrayteststring2)
+  arrayteststring = ""
+--  arrayteststring2 = ""
+end
+
+
+return map
+end
